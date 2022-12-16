@@ -1,10 +1,10 @@
 use anyhow::Result;
 use colored::Colorize;
+use crossbeam_channel::{bounded, Sender, Receiver};
 use libdogd::{LogLine, LOG_INPUT_ADDR, LOG_OUTPUT_ADDR, LogPriority};
 use std::{
-    net::TcpListener,
+    net::{TcpListener, TcpStream},
     io::{Read, Write},
-    sync::mpsc,
     thread,
 };
 
@@ -27,7 +27,7 @@ fn format_log(line: LogLine) -> String {
     buf.into_iter().collect()
 }
 
-fn listen_for_log(tx: mpsc::Sender<String>) -> Result<()> {
+fn listen_for_log(tx: Sender<String>) -> Result<()> {
     let listener = TcpListener::bind(LOG_INPUT_ADDR)?;
 
     for stream in listener.incoming() {
@@ -44,21 +44,26 @@ fn listen_for_log(tx: mpsc::Sender<String>) -> Result<()> {
     Ok(())
 }
 
-fn push_logs(rx: mpsc::Receiver<String>) -> Result<()> {
+fn handle_client(mut stream: TcpStream, rx: Receiver<String>) -> Result<()> {
+    loop {
+        let line = rx.recv()?;
+        stream.write_all(line.as_bytes())?;
+    }
+}
+
+fn push_logs(rx: Receiver<String>) -> Result<()> {
     let listener = TcpListener::bind(LOG_OUTPUT_ADDR)?;
 
     for stream in listener.incoming() {
-        let Ok(mut stream) = stream else { continue };
-        loop {
-            let line = rx.recv()?;
-            stream.write_all(line.as_bytes())?;
-        }
+        let Ok(stream) = stream else { continue };
+        let rx = rx.clone();
+        thread::spawn(move || handle_client(stream, rx));
     }
     Ok(())
 }
 
 fn main() -> Result<()> {
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = bounded(512);
 
     let listener_thread = thread::spawn(move || listen_for_log(tx));
     let pusher_thread = thread::spawn(move || push_logs(rx));
