@@ -12,6 +12,6 @@ name = "dogd"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1.0.66"
-serde = { version = "1.0.151", features = ["derive"] }
-toml = "0.5.10"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.5"
