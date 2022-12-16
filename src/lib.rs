@@ -45,11 +45,11 @@ pub fn log_debug(line: impl ToString) -> Result<()> {
     post_log(line.to_string(), curr_program(), LogPriority::Debug)
 }
 
-pub fn post_log(line: String, prog_name: String, priority: LogPriority) -> Result<()> {
+pub fn post_log(line: impl ToString, prog_name: impl ToString, priority: LogPriority) -> Result<()> {
     let mut stream = TcpStream::connect(LOG_INPUT_ADDR)?;
     let pkg = LogLine {
-        line,
-        prog_name,
+        line: line.to_string(),
+        prog_name: prog_name.to_string(),
         priority,
         time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
     };
