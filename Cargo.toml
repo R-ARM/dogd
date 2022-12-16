@@ -1,0 +1,17 @@
+[package]
+name = "dogd"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "libdogd"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dogd"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.66"
+serde = { version = "1.0.151", features = ["derive"] }
+toml = "0.5.10"
