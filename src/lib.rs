@@ -24,6 +24,27 @@ pub struct LogLine {
     time: Duration,
 }
 
+fn curr_program() -> String {
+    let raw_name = std::env::args().next().unwrap_or("<unknown>".to_string());
+    raw_name.split('/').last().unwrap().to_string()
+}
+
+pub fn log_critical(line: impl ToString) -> Result<()> {
+    post_log(line.to_string(), curr_program(), LogPriority::Critical)
+}
+
+pub fn log_error(line: impl ToString) -> Result<()> {
+    post_log(line.to_string(), curr_program(), LogPriority::Error)
+}
+
+pub fn log_info(line: impl ToString) -> Result<()> {
+    post_log(line.to_string(), curr_program(), LogPriority::Info)
+}
+
+pub fn log_debug(line: impl ToString) -> Result<()> {
+    post_log(line.to_string(), curr_program(), LogPriority::Debug)
+}
+
 pub fn post_log(line: String, prog_name: String, priority: LogPriority) -> Result<()> {
     let mut stream = TcpStream::connect(LOG_INPUT_ADDR)?;
     let pkg = LogLine {
