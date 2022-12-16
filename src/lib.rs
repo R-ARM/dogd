@@ -8,7 +8,7 @@ use std::{
 
 pub static LOG_INPUT_ADDR: &'static str = "127.0.0.1:4001";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum LogPriority {
     Critical,
     Error,
