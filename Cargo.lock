@@ -62,6 +62,7 @@ dependencies = [
  "anyhow",
  "colored",
  "crossbeam-channel",
+ "libdogd",
  "serde",
  "toml",
 ]
@@ -86,6 +87,17 @@ name = "libc"
 version = "0.2.138"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db6d7e329c562c5dfab7a46a2afabc8b987ab9a4834c9d1ca04dc54c1546cef8"
+
+[[package]]
+name = "libdogd"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "colored",
+ "crossbeam-channel",
+ "serde",
+ "toml",
+]
 
 [[package]]
 name = "proc-macro2"
