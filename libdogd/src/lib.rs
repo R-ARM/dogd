@@ -45,6 +45,16 @@ pub fn log_debug(line: impl ToString) {
     post_log(line.to_string(), curr_program(), LogPriority::Debug)
 }
 
+pub fn log_rust_error(err: impl std::error::Error, description: impl ToString, priority: LogPriority) {
+    let mut msg = Vec::new();
+    msg.push(description.to_string());
+    msg.push(err.to_string());
+    while let Some(err) = err.source() {
+        msg.push(err.to_string());
+    }
+    post_log(msg.into_iter().map(|v| v + "\n").collect::<String>(), curr_program(), priority);
+}
+
 pub fn post_log(line: impl ToString, prog_name: impl ToString, priority: LogPriority) {
     if let Err(e) = _post_log(line, prog_name, priority) {
         eprintln!("libdogd: Failed to post log message!");
