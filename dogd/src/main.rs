@@ -1,10 +1,11 @@
 use anyhow::Result;
 use colored::Colorize;
 use crossbeam_channel::{bounded, Sender, Receiver};
-use libdogd::{LogLine, LOG_INPUT_ADDR, LOG_OUTPUT_ADDR, LogPriority};
+use libdogd::{LogLine, LOG_INPUT_ADDR, LOG_OUTPUT_ADDR, LogPriority, log_error};
 use std::{
     net::{TcpListener, TcpStream},
     io::{Read, Write},
+    fs::File,
     thread,
 };
 
@@ -69,14 +70,30 @@ fn print_logs(rx: Receiver<String>) -> Result<()> {
     Ok(())
 }
 
+static LOG_PATH: &'static str = "/var/log/dogd";
+fn save_logs(rx: Receiver<String>) {
+    let Ok(mut file) = File::create(LOG_PATH) else {
+        log_error("Failed to open or create log file");
+        return;
+    };
+    while let Ok(line) = rx.recv() {
+        if file.write_all(line.as_bytes()).is_err() {
+            return;
+        }
+    }
+}
+
 fn main() -> Result<()> {
     let (tx, rx) = bounded(512);
 
     let rx2 = rx.clone();
+    let rx3 = rx.clone();
+    let log_saver_thread = thread::spawn(move || save_logs(rx3));
     let log_printer_thread = thread::spawn(move || print_logs(rx2));
     let listener_thread = thread::spawn(move || listen_for_log(tx));
     let pusher_thread = thread::spawn(move || push_logs(rx));
 
+    log_saver_thread.join().unwrap();
     log_printer_thread.join().unwrap()?;
     listener_thread.join().unwrap()?;
     pusher_thread.join().unwrap()?;
