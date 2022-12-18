@@ -62,12 +62,22 @@ fn push_logs(rx: Receiver<String>) -> Result<()> {
     Ok(())
 }
 
+fn print_logs(rx: Receiver<String>) -> Result<()> {
+    while let Ok(line) = rx.recv() {
+        print!("{}", line);
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let (tx, rx) = bounded(512);
 
+    let rx2 = rx.clone();
+    let log_printer_thread = thread::spawn(move || print_logs(rx2));
     let listener_thread = thread::spawn(move || listen_for_log(tx));
     let pusher_thread = thread::spawn(move || push_logs(rx));
 
+    log_printer_thread.join().unwrap()?;
     listener_thread.join().unwrap()?;
     pusher_thread.join().unwrap()?;
 
