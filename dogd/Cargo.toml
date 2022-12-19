@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 colored = "2.0.0"
-crossbeam-channel = "0.5.6"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.5"
 libdogd = { path = "../libdogd" }
+multiqueue = "0.3.2"

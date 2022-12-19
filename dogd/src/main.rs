@@ -1,6 +1,6 @@
 use anyhow::Result;
 use colored::Colorize;
-use crossbeam_channel::{bounded, Sender, Receiver};
+use multiqueue::{broadcast_queue, BroadcastSender, BroadcastReceiver};
 use libdogd::{LogLine, LOG_INPUT_ADDR, LOG_OUTPUT_ADDR, LogPriority, log_error};
 use std::{
     net::{TcpListener, TcpStream},
@@ -28,7 +28,7 @@ fn format_log(line: LogLine) -> String {
     buf.into_iter().collect()
 }
 
-fn listen_for_log(tx: Sender<String>) -> Result<()> {
+fn listen_for_log(tx: BroadcastSender<String>) -> Result<()> {
     let listener = TcpListener::bind(LOG_INPUT_ADDR)?;
 
     for stream in listener.incoming() {
@@ -40,30 +40,30 @@ fn listen_for_log(tx: Sender<String>) -> Result<()> {
         }
 
         let Ok(line) = toml::from_str::<LogLine>(&packet) else { continue };
-        tx.send(format_log(line))?;
+        tx.try_send(format_log(line))?;
     }
     Ok(())
 }
 
-fn handle_client(mut stream: TcpStream, rx: Receiver<String>) -> Result<()> {
+fn handle_client(mut stream: TcpStream, rx: BroadcastReceiver<String>) -> Result<()> {
     loop {
         let line = rx.recv()?;
         stream.write_all(line.as_bytes())?;
     }
 }
 
-fn push_logs(rx: Receiver<String>) -> Result<()> {
+fn push_logs(rx: BroadcastReceiver<String>) -> Result<()> {
     let listener = TcpListener::bind(LOG_OUTPUT_ADDR)?;
 
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
-        let rx = rx.clone();
-        thread::spawn(move || handle_client(stream, rx));
+        let recv = rx.add_stream();
+        thread::spawn(move || handle_client(stream, recv));
     }
     Ok(())
 }
 
-fn print_logs(rx: Receiver<String>) -> Result<()> {
+fn print_logs(rx: BroadcastReceiver<String>) -> Result<()> {
     while let Ok(line) = rx.recv() {
         print!("{}", line);
     }
@@ -71,7 +71,7 @@ fn print_logs(rx: Receiver<String>) -> Result<()> {
 }
 
 static LOG_PATH: &'static str = "/var/log/dogd";
-fn save_logs(rx: Receiver<String>) {
+fn save_logs(rx: BroadcastReceiver<String>) {
     let Ok(mut file) = File::create(LOG_PATH) else {
         log_error("Failed to open or create log file");
         return;
@@ -84,18 +84,18 @@ fn save_logs(rx: Receiver<String>) {
 }
 
 fn main() -> Result<()> {
-    let (tx, rx) = bounded(512);
+    let (tx, rx) = broadcast_queue(512);
 
-    let rx2 = rx.clone();
-    let rx3 = rx.clone();
+    let rx2 = rx.add_stream();
+    let rx3 = rx.add_stream();
     let log_saver_thread = thread::spawn(move || save_logs(rx3));
     let log_printer_thread = thread::spawn(move || print_logs(rx2));
-    let listener_thread = thread::spawn(move || listen_for_log(tx));
     let pusher_thread = thread::spawn(move || push_logs(rx));
+    let listener_thread = thread::spawn(move || listen_for_log(tx));
 
+    listener_thread.join().unwrap()?;
     log_saver_thread.join().unwrap();
     log_printer_thread.join().unwrap()?;
-    listener_thread.join().unwrap()?;
     pusher_thread.join().unwrap()?;
 
     Ok(())
