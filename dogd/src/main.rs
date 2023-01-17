@@ -1,32 +1,12 @@
 use anyhow::Result;
-use colored::Colorize;
 use multiqueue::{broadcast_queue, BroadcastSender, BroadcastReceiver};
-use libdogd::{LogLine, LOG_INPUT_ADDR, LOG_OUTPUT_ADDR, LogPriority, log_error};
+use libdogd::{format_log, LogLine, LOG_INPUT_ADDR, LOG_OUTPUT_ADDR, log_error};
 use std::{
     net::{TcpListener, TcpStream},
     io::{Read, Write},
     fs::File,
     thread,
 };
-
-fn format_log(line: LogLine) -> String {
-    let lines = line.line.trim()
-        .split('\n')
-        .collect::<Vec<&str>>();
-
-    let level = match line.priority {
-        LogPriority::Debug => "D".bright_black(),
-        LogPriority::Info => "I".normal(),
-        LogPriority::Error => "E".red(),
-        LogPriority::Critical => "C".on_white().red(),
-    };
-
-    let mut buf = Vec::new();
-    for this_line in lines {
-        buf.push(format!("{}({}) {}\n", line.prog_name, level, this_line));
-    }
-    buf.into_iter().collect()
-}
 
 fn listen_for_log(tx: BroadcastSender<String>) -> Result<()> {
     let listener = TcpListener::bind(LOG_INPUT_ADDR)?;
