@@ -20,7 +20,7 @@ fn listen_for_log(tx: BroadcastSender<String>) -> Result<()> {
         }
 
         let Ok(line) = toml::from_str::<LogLine>(&packet) else { continue };
-        tx.try_send(format_log(line))?;
+        tx.try_send(format_log(&line))?;
     }
     Ok(())
 }

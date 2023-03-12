@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 use colored::Colorize;
 use std::{
-    io::Write,
+    io::{self, Write, ErrorKind},
     net::{Shutdown, TcpStream},
     time::{UNIX_EPOCH, SystemTime, Duration},
     env,
@@ -31,7 +31,7 @@ fn curr_program() -> String {
     raw_name.split('/').last().unwrap().to_string()
 }
 
-pub fn format_log(line: LogLine) -> String {
+pub fn format_log(line: &LogLine) -> String {
     let lines = line.line.trim()
         .split('\n')
         .collect::<Vec<&str>>();
@@ -78,26 +78,33 @@ pub fn log_rust_error(err: impl std::error::Error, description: impl ToString, p
 
 pub fn post_log(line: impl ToString, prog_name: impl ToString, priority: LogPriority) {
     if let Err(e) = _post_log(line, prog_name, priority) {
-        #[cfg(feature = "stdout")] {
-            eprintln!("libdogd: Failed to post log message!");
-            eprintln!("{}", e);
+        if cfg!(feature = "stdout") {
+            let print_msg = e.downcast_ref::<io::Error>()
+                .map(|err| err.kind() != ErrorKind::ConnectionRefused)
+                .unwrap_or(true);
+            if print_msg {
+                eprintln!("libdogd: Failed to post log message!");
+                eprintln!("{}", e);
+            }
         }
     }
 }
 
 fn _post_log(line: impl ToString, prog_name: impl ToString, priority: LogPriority) -> Result<(), anyhow::Error> {
-    let mut stream = TcpStream::connect(LOG_INPUT_ADDR)?;
+
     let pkg = LogLine {
         line: line.to_string(),
         prog_name: prog_name.to_string(),
         priority,
         time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
     };
+    if cfg!(feature = "stdout") || env::var("LIBDOGD_FORCE_STDOUT_LOG").is_ok() {
+        println!("{}", format_log(&pkg).trim());
+    }
     let string = toml::to_string(&pkg)?;
+
+    let mut stream = TcpStream::connect(LOG_INPUT_ADDR)?;
     stream.write_all(string.as_bytes())?;
     stream.shutdown(Shutdown::Both)?;
-    if cfg!(feature = "stdout") || env::var("LIBDOGD_FORCE_STDOUT_LOG").is_ok() {
-        println!("{}", format_log(pkg));
-    }
     Ok(())
 }
